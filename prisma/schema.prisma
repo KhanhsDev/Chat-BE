@@ -7,10 +7,260 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ===========================
+// ENUMS
+// ===========================
+
+enum ConversationType {
+  private
+  group
+}
+
+enum ConversationRole {
+  owner
+  admin
+  member
+}
+
+enum MessageType {
+  text
+  image
+  video
+  file
+}
+
+enum FriendRequestStatus {
+  pending
+  accepted
+  rejected
+}
+
+// ===========================
+// USER
+// ===========================
+
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
+  id        Int       @id @default(autoincrement())
+  username  String    @db.VarChar(100)
+  email     String    @unique @db.VarChar(255)
+  password  String    @db.VarChar(255)
+  avatar    String?   @db.VarChar(500)
+  phone     String?   @db.VarChar(20)
+  bio       String?   @db.Text
+  isOnline  Boolean   @default(false) @map("is_online")
+  lastSeen  DateTime? @map("last_seen")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  createdConversations Conversation[]       @relation("ConversationCreator")
+  conversationMembers  ConversationMember[]
+  messages             Message[]
+
+  sentFriendRequests     FriendRequest[] @relation("FriendRequestSender")
+  receivedFriendRequests FriendRequest[] @relation("FriendRequestReceiver")
+
+  friends  Friend[] @relation("UserFriends")
+  friendOf Friend[] @relation("FriendOf")
+
+  messageReads     MessageRead[]
+  messageReactions MessageReaction[]
+  notifications    Notification[]
+  conversationPins ConversationPin[]
+
+  @@map("users")
+}
+
+// ===========================
+// CONVERSATION
+// ===========================
+
+model Conversation {
+  id        Int              @id @default(autoincrement())
+  type      ConversationType @default(private)
+  name      String?          @db.VarChar(255)
+  avatar    String?          @db.VarChar(500)
+  createdBy Int?             @map("created_by")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  creator User? @relation("ConversationCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  members  ConversationMember[]
+  messages Message[]
+  pins     ConversationPin[]
+
+  @@map("conversations")
+}
+
+// ===========================
+// CONVERSATION MEMBER
+// ===========================
+
+model ConversationMember {
+  id             Int              @id @default(autoincrement())
+  conversationId Int              @map("conversation_id")
+  userId         Int              @map("user_id")
+  role           ConversationRole @default(member)
+  joinedAt       DateTime         @default(now()) @map("joined_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId], map: "idx_members_user")
+  @@map("conversation_members")
+}
+
+// ===========================
+// MESSAGE
+// ===========================
+
+model Message {
+  id             BigInt      @id @default(autoincrement())
+  conversationId Int         @map("conversation_id")
+  senderId       Int         @map("sender_id")
+  type           MessageType @default(text)
+  content        String?     @db.Text
+  isEdited       Boolean     @default(false) @map("is_edited")
+  isDeleted      Boolean     @default(false) @map("is_deleted")
+  isRecalled     Boolean     @default(false) @map("is_recalled")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  attachments Attachment[]
+  reads       MessageRead[]
+  reactions   MessageReaction[]
+
+  @@index([conversationId], map: "idx_messages_conversation")
+  @@index([senderId], map: "idx_messages_sender")
+  @@index([createdAt], map: "idx_messages_created")
+  @@map("messages")
+}
+
+// ===========================
+// ATTACHMENT
+// ===========================
+
+model Attachment {
+  id        BigInt   @id @default(autoincrement())
+  messageId BigInt   @map("message_id")
+  fileName  String?  @map("file_name") @db.VarChar(255)
+  fileUrl   String?  @map("file_url") @db.VarChar(500)
+  fileSize  BigInt?  @map("file_size")
+  mimeType  String?  @map("mime_type") @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+// ===========================
+// FRIEND REQUEST
+// ===========================
+
+model FriendRequest {
+  id         BigInt              @id @default(autoincrement())
+  senderId   Int                 @map("sender_id")
+  receiverId Int                 @map("receiver_id")
+  status     FriendRequestStatus @default(pending)
+  createdAt  DateTime            @default(now()) @map("created_at")
+
+  sender   User @relation("FriendRequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("FriendRequestReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([receiverId], map: "idx_friend_request_receiver")
+  @@index([senderId], map: "idx_friend_request_sender")
+  @@map("friend_requests")
+}
+
+// ===========================
+// FRIEND
+// ===========================
+
+model Friend {
+  id        BigInt   @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  friendId  Int      @map("friend_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friend User @relation("FriendOf", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([userId], map: "idx_friends_user")
+  @@index([friendId], map: "idx_friends_friend")
+  @@map("friends")
+}
+
+// ===========================
+// MESSAGE READ
+// ===========================
+
+model MessageRead {
+  id        BigInt   @id @default(autoincrement())
+  messageId BigInt   @map("message_id")
+  userId    Int      @map("user_id")
+  readAt    DateTime @default(now()) @map("read_at")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("message_reads")
+}
+
+// ===========================
+// MESSAGE REACTION
+// ===========================
+
+model MessageReaction {
+  id        BigInt   @id @default(autoincrement())
+  messageId BigInt   @map("message_id")
+  userId    Int      @map("user_id")
+  reaction  String?  @db.VarChar(30)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("message_reactions")
+}
+
+// ===========================
+// NOTIFICATION
+// ===========================
+
+model Notification {
+  id        BigInt   @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  type      String?  @db.VarChar(100)
+  data      Json?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_notification_user")
+  @@map("notifications")
+}
+
+// ===========================
+// CONVERSATION PIN
+// ===========================
+
+model ConversationPin {
+  id             BigInt   @id @default(autoincrement())
+  conversationId Int      @map("conversation_id")
+  userId         Int      @map("user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_pins")
 }

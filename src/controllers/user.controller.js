@@ -3,7 +3,6 @@ const userService = require("../services/user.service");
 const getUsers = async (req, res) => {
   try {
     const users = await userService.getAll();
-
     return res.status(200).json({
       message: "Lấy danh sách người dùng thành công",
       data: users,

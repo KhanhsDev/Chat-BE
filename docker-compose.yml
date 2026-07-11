@@ -1,0 +1,18 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: chatMysql
+    restart: always
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: chat_app
+
+    ports:
+      - "3307:3306"
+
+    volumes:
+      - chatMysqlData:/var/lib/mysql
+
+volumes:
+  chatMysqlData:
