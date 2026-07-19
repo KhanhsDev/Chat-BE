@@ -14,7 +14,16 @@ const create = async (data) => {
   });
 };
 
+const findById = (id) => {
+  return prisma.user.findUnique({
+    where: {
+      id,
+    },
+  });
+};
+
 module.exports = {
+  findById,
   findByEmail,
   create,
 };

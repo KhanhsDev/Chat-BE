@@ -1,14 +1,17 @@
 const authService = require("../services/authService");
+const { Request, Response, NextFunction } = require("express");
 
-exports.login = async (req, res) => {
+exports.login = async (req, res, next) => {
   try {
     const result = await authService.login(req.body);
 
-    return res.json(result);
-  } catch (err) {
-    return res.status(400).json({
-      message: err.message,
+    res.status(200).json({
+      success: true,
+      message: "Đăng nhập thành công",
+      data: result,
     });
+  } catch (err) {
+    next(err);
   }
 };
 
@@ -32,4 +35,19 @@ exports.register = async (req, res) => {
 exports.getCurrentUser = async (req, res) => {
   console.log(req.user);
   res.json(req.user);
+};
+
+exports.refreshToken = async (req, res, next) => {
+  try {
+    const accessToken = await authService.refreshToken(req);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        accessToken,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
 };
