@@ -3,11 +3,14 @@ const { Server } = require("socket.io");
 
 const app = require("./app");
 
+const { initSocket } = require("./configs/socket");
 const prisma = require("./configs/prisma");
 
 const PORT = process.env.PORT || 8080;
 
 const server = http.createServer(app);
+
+initSocket(server);
 
 const io = new Server(server, {
   cors: {
